@@ -38,7 +38,7 @@ inputDataset = sampleDatasets_cpf_sv
 trainDir = opts.d
 inputTrainDataCollection = opts.t
 inputTestDataCollection = opts.i
-LoadModel = False
+LoadModel = False  # If false, loads weights, loading model can crash when using decorrelation
 removedVars = None
 if opts.era=="2016":
     eraText=r'2016 (13 TeV)'

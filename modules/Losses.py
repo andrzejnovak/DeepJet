@@ -12,7 +12,7 @@ NBINS = 40 # number of bins for loss function
 NCLASSES = int(os.getenv('NCLASSES', default='2'))
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA_ADV = float(os.getenv('LAMBDA_ADV', default='15')) # lambda for adversary/penalty
+LAMBDA_ADV = float(os.getenv('LAMBDA_ADV', default='2')) # lambda for adversary/penalty
 
 def loss_kldiv(y_in,x):
     """
