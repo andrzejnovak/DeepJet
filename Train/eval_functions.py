@@ -18,19 +18,19 @@ from sklearn.metrics import roc_curve, auc
 from root_numpy import array2root
 import pandas as pd
 import h5py
-NBINS=40
+from Losses import NBINS
 
 #sess = tf.InteractiveSession(config=tf.ConfigProto(log_device_placement=True))
 sess = tf.InteractiveSession()
 
-def loadModel(inputDir,trainData,model,LoadModel,sampleDatasets=None,removedVars=None):
+def loadModel(inputDir,trainData,model,LoadModel,sampleDatasets=None,removedVars=None,adv=False):
     inputModel = '%s/KERAS_check_best_model.h5'%inputDir
   
     from DeepJetCore.DataCollection import DataCollection
     traind=DataCollection()
     traind.readFromFile(trainData)
     traind.dataclass.regressiontargetclasses = range(0,NBINS)
-    print traind.getNRegressionTargets()
+    print(traind.getNRegressionTargets())
 
     if(LoadModel):
         evalModel = load_model(inputModel, custom_objects = global_loss_list)
@@ -41,12 +41,17 @@ def loadModel(inputDir,trainData,model,LoadModel,sampleDatasets=None,removedVars
         train_inputs = []
         for s in shapes:
             train_inputs.append(keras.layers.Input(shape=s))
-        evalModel = model(train_inputs,traind.getNClassificationTargets(),traind.getNRegressionTargets(),sampleDatasets,removedVars)
+        modelargs = {}
+        if adv:
+            modelargs.update({'nRegTargets':NBINS,
+                              'discTrainable': True,
+                              'advTrainable':True})
+        evalModel = model(train_inputs,traind.getNClassificationTargets(),traind.getNRegressionTargets(),sampleDatasets,removedVars,**modelargs)
         evalModel.load_weights(inputModel)
 
     return evalModel
 
-def evaluate(testd, trainData, model, outputDir, storeInputs=False):
+def evaluate(testd, trainData, model, outputDir, storeInputs=False, adv=False):
     	NENT = 1  # Can skip some events
     	filelist=[]
         i=0
@@ -105,7 +110,12 @@ def evaluate(testd, trainData, model, outputDir, storeInputs=False):
 	for i, tname in enumerate(truthnames):
 		df['truth'+tname] = labels_val[:,i]
 		#print "Mean 0th label predict predict of ", tname, np.mean(predict_test[:,0]), ", Stats:", np.sum(labels_val[:,i]), "/", len(labels_val[:,i])
-		df['predict'+tname] = predict_test[:,i]
+                if adv:
+		    df['predict'+tname] = predict_test[:,NBINS+i]
+                    for j in range(NBINS):
+                        df['predict_massbin%i'%j] = predict_test[:,j+i]
+                else:
+                    df['predict'+tname] = predict_test[:,i]
 
 	print "Testing prediction:"
 	print "Total: ", len(predict_test[:,0])
