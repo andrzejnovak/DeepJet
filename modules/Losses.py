@@ -11,7 +11,7 @@ global_loss_list={}
 NBINS = 40 # number of bins for loss function
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA = 15 # lambda for penalty
+LAMBDA = 2 # lambda for penalty
 try:
     LAMBDA_ADV = float(os.environ['LAMBDA_ADV']) # lambda for adversary
 except:
