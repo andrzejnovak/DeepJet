@@ -29,7 +29,7 @@ inputDataset = sampleDatasets_pf_cpf_sv
 trainDir = opts.d
 inputTrainDataCollection = opts.t
 inputTestDataCollection = opts.i
-LoadModel = False
+LoadModel = False  # If false, loads weights, loading model can crash when using decorrelation
 removedVars = None
 
 if True:
