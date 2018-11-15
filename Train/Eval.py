@@ -6,6 +6,7 @@ os.environ['CUDA_VISIBLE_DEVICES']=''
 parser = ArgumentParser(description ='Script to run the training and evaluate it')
 parser.add_argument("--adv", action='store_true', default=False, help="Load adversarial model")
 parser.add_argument("--decor", action='store_true', default=False, help="Serve decorrelated training targets")
+parser.add_argument("--reduced", action='store_true', default=False, help="reduced model")
 parser.add_argument("--multi", action='store_true', default=False, help="Binary or categorical crossentropy")
 parser.add_argument("-i", help="Training dataCollection.dc", default=None, metavar="FILE")
 parser.add_argument("-t", help="Testing dataCollection.dc", default=None, metavar="FILE")
@@ -26,6 +27,8 @@ sampleDatasets_sv = ["db","sv"]
 #select model and eval functions
 if opts.adv:
     from models import model_DeepDoubleXAdversarial as trainingModel
+elif opts.reduced:
+    from models import model_DeepDoubleXReduced as trainingModel
 else:
     from models import model_DeepDoubleXReference as trainingModel
 from DeepJetCore.training.training_base import training_base
