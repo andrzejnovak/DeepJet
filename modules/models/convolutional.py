@@ -3,6 +3,7 @@ from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import Add, Multiply
+from keras import backend as K
 from buildingBlocks import block_deepFlavourConvolutions, block_deepFlavourDense, block_SchwartzImage, block_deepFlavourBTVConvolutions
 from Layers import GradientReversal, global_layers_list
 
@@ -526,7 +527,7 @@ def model_DeepDoubleXReduced(inputs, num_classes, num_regclasses, datasets = ['d
 
     return model
 
-def model_DeepDoubleXAdversarial(inputs, num_classes, num_regclasses, datasets = ['db','cpf','sv'], removedVars = None, multi_gpu=1, scale=1.0, discTrainable = True, advTrainable = True, **kwargs):
+def model_DeepDoubleXAdversarial(inputs, num_classes, num_regclasses, datasets = ['db','cpf','sv'], removedVars = None, multi_gpu=1, scale=K.variable(1.0), discTrainable = True, advTrainable = True, **kwargs):
 
     """
     adversarial 1x1 convolutional model for 'deepDoubleX'
