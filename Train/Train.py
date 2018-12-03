@@ -8,6 +8,8 @@ parser.add_argument("--reduced", action='store_true', default=False, help="reduc
 parser.add_argument("--loss", default="loss_kldiv", choices=['loss_kldiv', 'loss_kldiv_3class', 'loss_reg', 'loss_jsdiv'],
                     help="loss to use for decorrelated training")
 parser.add_argument("--lambda-adv", default='15', help="lambda for adversarial training", type=str)
+parser.add_argument("--scale", default='1', help="(initial) scale factor (-lambda_r) for backprop during adversarial training", type=str)
+parser.add_argument("--scale-callback",action='store_true', default = False, help = "scale factor (-lambda_r) callback to set it to 2/(1+exp(-10*i_epoch/n_epochs)-1")
 parser.add_argument("--classes", default='2', help="Number of classes for multiclassifier", type=str)
 parser.add_argument("-g", "--gpu", default=-1, help="Use 1 specific gpu (Need to be in deepjetLinux3_gpu env)", type=int)
 parser.add_argument("-m", "--multi-gpu", action='store_true', default=False, help="Use all visible gpus (Need to be in deepjetLinux3_gpu env)")
@@ -49,6 +51,7 @@ from Losses import loss_NLL, loss_meansquared, loss_kldiv, loss_kldiv_3class, gl
 from DeepJetCore.modeltools import fixLayersContaining,printLayerInfosAndWeights
 from Layers import global_layers_list
 from Metrics import global_metrics_list, acc_kldiv, mass_kldiv_q, mass_kldiv_h, acc_reg, mass_jsdiv_q
+from keras import backend as K
 custom_objects_list = {}
 custom_objects_list.update(global_loss_list)
 custom_objects_list.update(global_layers_list)
@@ -92,9 +95,12 @@ if True:  # Should probably fix
     if not train.modelSet():
         modelargs = {}
         if opts.loss=='loss_reg':
-            modelargs.update({'nRegTargets':NBINS,
+            lambda_variable = K.variable(abs(float(opts.scale)))
+            modelargs.update({'nRegTargets':NBINS,                  
                               'discTrainable': True,
-                              'advTrainable':True})
+                              'advTrainable':True,
+                              'scale': lambda_variable})
+            
         train.setModel(trainingModel, 
 		       datasets=inputDataset, 
 		       multi_gpu=multi_gpu,
@@ -138,6 +144,9 @@ if True:  # Should probably fix
         train.loadWeights(opts.pretrained_model)
         
     # Train
+    lambda_callback = None
+    if opts.decor and opts.loss=='loss_reg' and opts.scale_callback:
+        lambda_callback = lambda_variable
     model, history = train.trainModel(nepochs=int(opts.epochs),
 				      batchsize=int(opts.batch),
                                       stop_patience=50,
@@ -146,6 +155,7 @@ if True:  # Should probably fix
                                       lr_epsilon=0.00000001,
                                       lr_cooldown=2,
                                       lr_minimum=0.00000001,
-                                      maxqsize=100)
+                                      maxqsize=100,
+                                      lambda_callback=lambda_callback)
 
     

@@ -15,7 +15,8 @@ class TrainData_DeepDoubleX(TrainData):
         #define truth:
 	self.treename = "deepntuplizer/tree"
         self.undefTruth=['isUndefined']
-	self.truthclasses=["fj_isH", "fj_isCC", "fj_isBB", "fj_isNonCC" , "fj_isNonBB", "fj_isZ", "fj_isQCD" , "sample_isQCD"]
+	#self.truthclasses=["fj_isH", "fj_isCC", "fj_isBB", "fj_isNonCC" , "fj_isNonBB", "fj_isZ", "fj_isQCD" , "sample_isQCD"]
+        self.truthclasses=["fj_isH", "fj_isBB", "fj_isNonBB", "fj_isZ", "fj_isQCD" , "sample_isQCD"]
 
         self.referenceclass='lowest' ## used for pt reshaping options=['lowest', 'flatten', '<class_name>']
         self.weightbranchX='fj_pt'
@@ -198,7 +199,6 @@ class TrainData_DeepDoubleX_db(TrainData_DeepDoubleX):
 #######################################
             
 class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
-   # NOT UP TO DATE
     def __init__(self):
         '''
         This is an example data format description for FatJet studies
@@ -249,19 +249,19 @@ class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
                           ])
         
         #example of pf candidate branches
-        """self.addBranches(['pfcand_ptrel',
-                          #'pfcand_erel',
+        self.addBranches(['pfcand_ptrel',
+                          'pfcand_erel',
                           'pfcand_phirel',
                           'pfcand_etarel',
                           'pfcand_deltaR',
                           'pfcand_puppiw',
                           'pfcand_drminsv',
                           'pfcand_drsubjet1',
-                          #'pfcand_drsubjet2',
+                          'pfcand_drsubjet2',
                           'pfcand_hcalFrac'
                          ],
                          100) 
-	"""
+
         self.addBranches(['track_ptrel',     
                           'track_erel',     
                           'track_phirel',     
@@ -325,29 +325,25 @@ class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
         tree = rfile.Get("deepntuplizer/tree")
         self.nsamples=tree.GetEntries()
         
-        x_glb  = ZeroPadParticles(filename,TupleMeanStd,
+        x_glb  = ZeroPadParticles(filename,None,
                                           self.branches[0],
                                           self.branchcutoffs[0],self.nsamples)
 
-        x_db  = ZeroPadParticles(filename,TupleMeanStd,
+        x_db  = ZeroPadParticles(filename,None,
                                          self.branches[1],
                                          self.branchcutoffs[1],self.nsamples)
 
-        x_db_raw  = ZeroPadParticles(filename,TupleMeanStd,
-                                         self.branches[1],
-                                         self.branchcutoffs[1],self.nsamples)
-
-        x_pf  = ZeroPadParticles(filename,TupleMeanStd,
+        x_pf  = ZeroPadParticles(filename,None,
                                          self.branches[2],
                                          self.branchcutoffs[2],self.nsamples)
         
-        x_cpf = ZeroPadParticles(filename,TupleMeanStd,
-                                         self.branches[2],
-                                         self.branchcutoffs[2],self.nsamples)
+        x_cpf = ZeroPadParticles(filename,None,
+                                         self.branches[3],
+                                         self.branchcutoffs[3],self.nsamples)
         
-        x_sv = ZeroPadParticles(filename,TupleMeanStd,
-                                        self.branches[3],
-                                        self.branchcutoffs[3],self.nsamples)
+        x_sv = ZeroPadParticles(filename,None,
+                                        self.branches[4],
+                                        self.branchcutoffs[4],self.nsamples)
        
         Tuple = self.readTreeFromRootToTuple(filename)
         if self.remove:
@@ -377,18 +373,18 @@ class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
             weights=weights[notremoves > 0]
             x_glb=x_glb[notremoves > 0]
             x_db=x_db[notremoves > 0]
-            x_db_raw=x_db_raw[notremoves > 0]
-            x_sv=x_sv[notremoves > 0]
+            x_pf=x_pf[notremoves > 0]
             x_cpf=x_cpf[notremoves > 0]
+            x_sv=x_sv[notremoves > 0]
             alltruth=alltruth[notremoves > 0]
 	
 	if self.weight:
 	    print('Adding weights, removing events with 0 weight')
             x_glb=x_glb[weights > 0]
             x_db=x_db[weights > 0]
-            x_db_raw=x_db_raw[weights > 0]
-            x_sv=x_sv[weights > 0]
+            x_pf=x_pf[weights > 0]
             x_cpf=x_cpf[weights > 0]
+            x_sv=x_sv[weights > 0]
             alltruth=alltruth[weights > 0]
 	    # Weights get adjusted last so they can be used as an index
             weights=weights[weights > 0]
@@ -399,8 +395,8 @@ class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
         
         # fill everything
         self.w=[weights]
-        self.x=[x_db,x_cpf,x_sv]
-        self.z=[x_glb, x_db_raw]
+        self.x=[x_db,x_pf,x_cpf,x_sv]
+        self.z=[x_glb]
         self.y=[alltruth]
 
     def reduceTruth(self, tuple_in):
@@ -520,23 +516,19 @@ class TrainData_DeepDoubleX_db_cpf_sv_reduced(TrainData_DeepDoubleX):
 	# MeanNormZeroPad[Particles] does preprocessing, ZeroPad[Particles] does not and we normalzie it with batch_norm layer
 	# MeanNorm* does not work when putting the model into cmssw
     
-        x_glb  = ZeroPadParticles(filename,TupleMeanStd,
+        x_glb  = ZeroPadParticles(filename,None,
                                           self.branches[0],
                                           self.branchcutoffs[0],self.nsamples)
 
-        x_db  = ZeroPadParticles(filename,TupleMeanStd,
+        x_db  = ZeroPadParticles(filename,None,
                                          self.branches[1],
                                          self.branchcutoffs[1],self.nsamples)
-       
-        x_db_raw  = ZeroPadParticles(filename,TupleMeanStd,
-                                         self.branches[1],
-                                         self.branchcutoffs[1],self.nsamples)
- 
-        x_cpf = ZeroPadParticles(filename,TupleMeanStd,
+        
+        x_cpf = ZeroPadParticles(filename,None,
                                          self.branches[2],
                                          self.branchcutoffs[2],self.nsamples)
         
-        x_sv = ZeroPadParticles(filename,TupleMeanStd,
+        x_sv = ZeroPadParticles(filename,None,
                                         self.branches[3],
                                         self.branchcutoffs[3],self.nsamples)
         
@@ -569,7 +561,6 @@ class TrainData_DeepDoubleX_db_cpf_sv_reduced(TrainData_DeepDoubleX):
             weights=weights[notremoves > 0]
             x_glb=x_glb[notremoves > 0]
             x_db=x_db[notremoves > 0]
-            x_db_raw=x_db_raw[notremoves > 0]
             x_sv=x_sv[notremoves > 0]
             x_cpf=x_cpf[notremoves > 0]
             used_truth=used_truth[notremoves > 0]
@@ -578,7 +569,6 @@ class TrainData_DeepDoubleX_db_cpf_sv_reduced(TrainData_DeepDoubleX):
 	    print('Adding weights, removing events with 0 weight')
             x_glb=x_glb[weights > 0]
             x_db=x_db[weights > 0]
-            x_db_raw=x_db_raw[weights > 0]
             x_sv=x_sv[weights > 0]
             x_cpf=x_cpf[weights > 0]
             used_truth=used_truth[weights > 0]
@@ -592,7 +582,7 @@ class TrainData_DeepDoubleX_db_cpf_sv_reduced(TrainData_DeepDoubleX):
         # fill everything
         self.w=[weights]
         self.x=[x_db,x_cpf,x_sv]
-        self.z=[x_glb, x_db_raw]
+        self.z=[x_glb]
         self.y=[used_truth]
 
 class TrainData_DeepDoubleC_db_cpf_sv_reduced(TrainData_DeepDoubleX_db_cpf_sv_reduced):
@@ -678,6 +668,22 @@ class TrainData_DeepDoubleCvB_db_cpf_sv_reduced_incglu(TrainData_DeepDoubleX_db_
 #          DeepDoubleBvL            #
 #####################################
 class TrainData_DeepDoubleB_db_cpf_sv_reduced(TrainData_DeepDoubleX_db_cpf_sv_reduced):
+    ## categories to use for training
+    def reduceTruth(self, tuple_in):
+        import numpy
+        self.reducedtruthclasses=['QCD','Hbb']
+        if tuple_in is not None:
+	    q = tuple_in['fj_isQCD'] * tuple_in['sample_isQCD']
+            q = q.view(numpy.ndarray)
+            h = tuple_in['fj_isBB'] * tuple_in['fj_isH']
+            h = h.view(numpy.ndarray)
+
+            return numpy.vstack((q,h)).transpose()
+
+#####################################
+#          DeepDoubleBvL            #
+#####################################
+class TrainData_DeepDoubleB_db_pf_cpf_sv(TrainData_DeepDoubleX_db_pf_cpf_sv):
     ## categories to use for training
     def reduceTruth(self, tuple_in):
         import numpy
