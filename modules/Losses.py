@@ -1,7 +1,7 @@
-import os
+
 from keras import backend as K
 from tensorflow import where, greater, abs, zeros_like, exp
-import tensorflow as tf
+import tensorflow as tf, os
 from keras.losses import kullback_leibler_divergence, categorical_crossentropy, binary_crossentropy
 
 global_loss_list={}
@@ -9,16 +9,14 @@ global_loss_list={}
 #whenever a new loss function is created, please add it to the global_loss_list dictionary!
 
 NBINS = 40 # number of bins for loss function
+NCLASSES = int(os.getenv('NCLASSES', default='2'))
 MMAX = 200. # max value
 MMIN = 40. # min value
-LAMBDA = 2 # lambda for penalty
-try:
-    LAMBDA_ADV = float(os.environ['LAMBDA_ADV']) # lambda for adversary
-except:
-    LAMBDA_ADV = 15 # lambda for adversary
+LAMBDA_ADV = float(os.getenv('LAMBDA_ADV', default='2')) # lambda for adversary/penalty
+
 def loss_kldiv(y_in,x):
     """
-    mass sculpting penlaty term usking kullback_leibler_divergence
+    mass sculpting penlaty term using kullback_leibler_divergence
     y_in: truth [h, y]
     x: predicted NN output for y
     h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
@@ -48,12 +46,55 @@ def loss_kldiv(y_in,x):
     # compute KL divergence between true q events weighted by b vs q prob (symmetrize?)
     # compute KL divergence between true b events weighted by b vs q prob (symmetrize?)
     return categorical_crossentropy(y, x) + \
-        LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
-        LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_b, h_qtag_b)         
 
 #please always register the loss function here                                                                                              
 global_loss_list['loss_kldiv']=loss_kldiv
 
+def loss_jsdiv(y_in,x):
+    """
+    mass sculpting penlaty term using jenson-shannon divergence
+    y_in: truth [h, y]
+    x: predicted NN output for y
+    h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
+    y: the truth categorical labels  "one-hot encoded" (length NClasses=2)
+    """
+    h = y_in[:,0:NBINS]
+    y = y_in[:,NBINS:NBINS+2]
+    
+    # build mass histogram for true q events weighted by q, b prob
+    h_alltag_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
+    # build mass histogram for true b events weighted by q, b prob
+    h_alltag_b = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
+    
+    # select mass histogram for true q events weighted by q prob; normalize
+    h_qtag_q = h_alltag_q[:,0]
+    h_qtag_q = h_qtag_q / K.sum(h_qtag_q,axis=0)
+    # select mass histogram for true q events weighted by b prob; normalize
+    h_btag_q = h_alltag_q[:,1]
+    h_btag_q = h_btag_q / K.sum(h_btag_q,axis=0)
+
+    h_aver_q = 0.5*h_btag_q+0.5*h_qtag_q
+
+    # select mass histogram for true b events weighted by q prob; normalize        
+    h_qtag_b = h_alltag_b[:,0]
+    h_qtag_b = h_qtag_b / K.sum(h_qtag_b,axis=0)
+    # select mass histogram for true b events weighted by b prob; normalize        
+    h_btag_b = h_alltag_b[:,1]
+    h_btag_b = h_btag_b / K.sum(h_btag_b,axis=0)
+
+    h_aver_b = 0.5*h_btag_b+0.5*h_qtag_b
+
+    # compute KL divergence between true q events weighted by b vs q prob (symmetrized)
+    return categorical_crossentropy(y, x) + \
+        LAMBDA_ADV*0.5*kullback_leibler_divergence(h_btag_q, h_aver_q) + \
+        LAMBDA_ADV*0.5*kullback_leibler_divergence(h_qtag_q, h_aver_q) + \
+        LAMBDA_ADV*0.5*kullback_leibler_divergence(h_btag_b, h_aver_b) + \
+        LAMBDA_ADV*0.5*kullback_leibler_divergence(h_qtag_b, h_aver_b)         
+
+#please always register the loss function here                                                                                              
+global_loss_list['loss_jsdiv']=loss_jsdiv
 
 def custom_crossentropy(y_in,x):
     """
@@ -71,13 +112,13 @@ def loss_reg(y_in,x_in):
     y_in: truth [h, y]
     x: predicted NN output for y
     h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
-    y: the truth categorical labels  "one-hot encoded" (length NClasses=2)
+    y: the truth categorical labels  "one-hot encoded" (length NClasses=?)
     """
     h = y_in[:,0:NBINS]
-    y = y_in[:,NBINS:NBINS+2]
+    y = y_in[:,NBINS:NBINS+NCLASSES]
     
     hpred = x_in[:,0:NBINS]
-    ypred = x_in[:,NBINS:NBINS+2]
+    ypred = x_in[:,NBINS:NBINS+NCLASSES]
     
     return categorical_crossentropy(y, ypred) + LAMBDA_ADV*categorical_crossentropy(h, hpred)
 
@@ -87,12 +128,22 @@ def loss_disc(y_in,x_in):
     """
     Loss for only the discriminator part
     """
-    y = y_in[:,NBINS:NBINS+2]
-    ypred = x_in[:,NBINS:NBINS+2]
+    y = y_in[:,NBINS:NBINS+NCLASSES]
+    ypred = x_in[:,NBINS:NBINS+NCLASSES]
 
     return categorical_crossentropy(y, ypred)
 
 global_loss_list['loss_disc']=loss_disc
+
+def loss_disc_kldiv(y_in,x):
+    """
+    Loss for only the discriminator part for kldiv
+    """
+    y = y_in[:,NBINS:NBINS+2]
+
+    return categorical_crossentropy(y, x)
+
+global_loss_list['loss_disc_kldiv']=loss_disc_kldiv
 
 def loss_adv(y_in,x_in):
     """
@@ -107,7 +158,7 @@ global_loss_list['loss_adv']=loss_adv
 
 def loss_kldiv_3class(y_in,x):
     """
-    mass sculpting penlaty term usking kullback_leibler_divergence
+    mass sculpting penlaty term using kullback_leibler_divergence
     y_in: truth [h, y]
     x: predicted NN output for y
     h: the truth mass histogram vector "one-hot encoded" (length NBINS=40)
@@ -156,12 +207,19 @@ def loss_kldiv_3class(y_in,x):
     # compute KL divergence between true q events weighted by c vs q prob (symmetrize?)
     # compute KL divergence between true c events weighted by c vs q prob (symmetrize?)
     return categorical_crossentropy(y, x) + \
+<<<<<<< HEAD
         LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
         LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b) + \
         LAMBDA*kullback_leibler_divergence(h_ctag_q, h_qtag_q) + \
         LAMBDA*kullback_leibler_divergence(h_ctag_c, h_qtag_c) + \
         LAMBDA*kullback_leibler_divergence(h_btag_c, h_ctag_c) + \
         LAMBDA*kullback_leibler_divergence(h_btag_b, h_ctag_b)
+=======
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_b, h_qtag_b) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_ctag_q, h_qtag_q) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_ctag_c, h_qtag_c)
+>>>>>>> fce4629d750ef96cd6c9156ded72de3759b7e5cc
 
 #please always register the loss function here                                                                                              
 global_loss_list['loss_kldiv_3class']=loss_kldiv_3class
