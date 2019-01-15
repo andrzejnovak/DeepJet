@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser()
 parser.add_argument("--train", help="Path to training sample")
-parser.add_argument("--test", help="Path to testing sample", default=None)
+parser.add_argument("--test", help="Path to testing sample, if not specified will replace 'train' with 'test' in train path", default=None)
 parser.add_argument("--listname", help="'(train/test)_'+listname+'.root'", default="list")
 args=parser.parse_args()
 

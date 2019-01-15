@@ -1,9 +1,10 @@
-from keras.layers import Dense, Dropout, Flatten,Concatenate, Convolution2D, LSTM,merge, Convolution1D, Conv2D, GRU, SpatialDropout1D, Conv1D
+from keras.layers import Dense, Dropout, Flatten,Concatenate, Convolution2D, LSTM,merge, Convolution1D, Conv2D, GRU, SpatialDropout1D, Conv1D, Lambda
 from keras.models import Model
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import Add, Multiply
 from buildingBlocks import block_deepFlavourConvolutions, block_deepFlavourDense, block_SchwartzImage, block_deepFlavourBTVConvolutions
+from Layers import GradientReversal, global_layers_list
 
 def model_deepFlavourNoNeutralReference(Inputs,nclasses,nregclasses,dropoutRate=0.1):
     """
@@ -439,9 +440,10 @@ def FC(data, num_hidden, act='relu', p=None, name='', trainable=True):
         dropout = Dropout(rate=p, name='%s_dropout' % name)(fc)
         return dropout
 
-def model_deepDoubleBReference(inputs, num_classes, num_regclasses, datasets = ['db','cpf','SV'], removedVars = None):
+def model_DeepDoubleXReference(inputs, num_classes, num_regclasses, datasets = ['db','cpf','sv'], removedVars = None, multi_gpu=1,  **kwargs):
+
     """
-    reference 1x1 convolutional model for 'deepDoubleB'
+    reference 1x1 convolutional model for 'deepDoubleX'
     with recurrent layers and batch normalisation
     """
     kernel_initializer = 'he_normal'
@@ -454,6 +456,103 @@ def model_deepDoubleBReference(inputs, num_classes, num_regclasses, datasets = [
 
     flattenLayers = []
     flattenLayers.append(Flatten()(normalizedInputs[0]))
+
+    for ds, normalizedInput in zip(datasets[1:],normalizedInputs[1:]):                
+        x = Conv1D(filters=32, kernel_size=(1,), strides=(1,), padding='same', 
+                                kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv1'%ds, 
+                                activation = 'relu')(normalizedInput)
+        x = SpatialDropout1D(rate=0.1)(x)
+        x = Conv1D(filters=32, kernel_size=(1,), strides=(1,), padding='same', 
+                             kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv2'%ds, 
+                             activation = 'relu')(x)
+        x = SpatialDropout1D(rate=0.1)(x)
+        x = GRU(50,go_backwards=True,implementation=2,name='%s_gru'%ds)(x)
+        x = Dropout(rate=0.1)(x)
+        flattenLayers.append(x)
+
+    concat = Concatenate()(flattenLayers)
+
+
+    fc = FC(concat, 100, p=0.1, name='fc1')
+    output = Dense(num_classes, activation='softmax', name='ID_pred', kernel_initializer=kernel_initializer_fc)(fc)
+                            
+    model = Model(inputs=inputs, outputs=[output])
+    if multi_gpu > 1:
+        from multi_gpu_model import multi_gpu_model
+        model = multi_gpu_model(model, gpus=multi_gpu)
+
+    return model
+
+def model_DeepDoubleXAdversarial(inputs, num_classes, num_regclasses, datasets = ['db','cpf','sv'], removedVars = None, multi_gpu=1, scale=1.0, discTrainable = True, advTrainable = True, **kwargs):
+
+    """
+    adversarial 1x1 convolutional model for 'deepDoubleX'
+    with recurrent layers and batch normalisation
+    """
+    kernel_initializer = 'he_normal'
+    kernel_initializer_fc = 'lecun_uniform'
+    normalizedInputs = []
+
+    for i in range(len(inputs)):
+        normedLayer = BatchNormalization(momentum=0.3,name = '%s_input_batchnorm'%datasets[i], trainable=discTrainable)(inputs[i])
+        normalizedInputs.append(normedLayer)
+
+    flattenLayers = []
+    flattenLayers.append(Flatten()(normalizedInputs[0]))
+
+    for ds, normalizedInput in zip(datasets[1:],normalizedInputs[1:]):                
+        x = Conv1D(filters=32, kernel_size=(1,), strides=(1,), padding='same', 
+                                kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv1'%ds, 
+                                activation = 'relu', trainable=discTrainable)(normalizedInput)
+        x = SpatialDropout1D(rate=0.1)(x)
+        x = Conv1D(filters=32, kernel_size=(1,), strides=(1,), padding='same', 
+                             kernel_initializer=kernel_initializer, use_bias=False, name='%s_conv2'%ds, 
+                             activation = 'relu', trainable=discTrainable)(x)
+        x = SpatialDropout1D(rate=0.1)(x)
+        x = GRU(50,go_backwards=True,implementation=2,name='%s_gru'%ds, trainable=discTrainable)(x)
+        x = Dropout(rate=0.1)(x)
+        flattenLayers.append(x)
+
+    concat = Concatenate()(flattenLayers)
+
+
+    fc = FC(concat, 100, p=0.1, name='fc1', trainable=discTrainable)
+    output = Dense(num_classes, activation='softmax', name='ID_pred', kernel_initializer=kernel_initializer_fc, trainable=discTrainable)(fc)
+
+    if num_regclasses>0: 
+        reverse = GradientReversal(hp_lambda=scale, name='reverse')(fc)
+        fc = FC(reverse, 32, p=0.1, name='fc2', act ='tanh', trainable=advTrainable)
+        fc = FC(fc, 32, p=0.1, name='fc3', act='tanh', trainable=advTrainable)
+        output_reg = Dense(num_regclasses, activation='softmax', name='mass_reg', kernel_initializer=kernel_initializer_fc, trainable=advTrainable)(fc)
+        output = Concatenate()([output_reg, output])
+                                                            
+    model = Model(inputs=inputs, outputs=[output])
+    
+    if multi_gpu > 1:
+        from multi_gpu_model import multi_gpu_model
+        model = multi_gpu_model(model, gpus=multi_gpu)
+        
+    return model
+
+def model_DeepDoubleBLambda(inputs, num_classes, num_regclasses, datasets = ['db','pf','cpf','sv'], removedVars = None):
+    """
+    lambda 1x1 convolutional model for 'DeepDoubleB'
+    with recurrent layers and batch normalisation
+    """
+    kernel_initializer = 'he_normal'
+    kernel_initializer_fc = 'lecun_uniform'
+    normalizedInputs = []
+
+    for i in range(len(inputs)):
+        normedLayer = BatchNormalization(momentum=0.3,name = '%s_input_batchnorm'%datasets[i])(inputs[i])
+        normalizedInputs.append(normedLayer)
+
+    lambdaLayer = Lambda(lambda x: 0*x, name='%s_lambda'%datasets[0])(normalizedInputs[0])
+    def slicer(x):
+        return x[:,:,0:1]    
+    lambdaLayer = Lambda(slicer)(lambdaLayer)
+    flattenLayers = []
+    flattenLayers.append(Flatten()(lambdaLayer))
 
     for ds, normalizedInput in zip(datasets[1:],normalizedInputs[1:]):                
         x = Conv1D(filters=32, kernel_size=(1,), strides=(1,), padding='same', 
