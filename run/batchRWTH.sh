@@ -21,7 +21,7 @@
 #BSUB -gpu -
 #BSUB -R gpu
  
-module load cuda/
+#module load cuda
 
 export PATH="/home/ne020107/miniconda2/bin:$PATH"
 INDIR=~/DDX/DeepJet/test

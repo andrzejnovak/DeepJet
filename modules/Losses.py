@@ -207,19 +207,12 @@ def loss_kldiv_3class(y_in,x):
     # compute KL divergence between true q events weighted by c vs q prob (symmetrize?)
     # compute KL divergence between true c events weighted by c vs q prob (symmetrize?)
     return categorical_crossentropy(y, x) + \
-<<<<<<< HEAD
-        LAMBDA*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
-        LAMBDA*kullback_leibler_divergence(h_btag_b, h_qtag_b) + \
-        LAMBDA*kullback_leibler_divergence(h_ctag_q, h_qtag_q) + \
-        LAMBDA*kullback_leibler_divergence(h_ctag_c, h_qtag_c) + \
-        LAMBDA*kullback_leibler_divergence(h_btag_c, h_ctag_c) + \
-        LAMBDA*kullback_leibler_divergence(h_btag_b, h_ctag_b)
-=======
         LAMBDA_ADV*kullback_leibler_divergence(h_btag_q, h_qtag_q) + \
         LAMBDA_ADV*kullback_leibler_divergence(h_btag_b, h_qtag_b) + \
         LAMBDA_ADV*kullback_leibler_divergence(h_ctag_q, h_qtag_q) + \
-        LAMBDA_ADV*kullback_leibler_divergence(h_ctag_c, h_qtag_c)
->>>>>>> fce4629d750ef96cd6c9156ded72de3759b7e5cc
+        LAMBDA_ADV*kullback_leibler_divergence(h_ctag_c, h_qtag_c) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_c, h_ctag_c) + \
+        LAMBDA_ADV*kullback_leibler_divergence(h_btag_b, h_ctag_b)
 
 #please always register the loss function here                                                                                              
 global_loss_list['loss_kldiv_3class']=loss_kldiv_3class
