@@ -67,6 +67,7 @@ if True:  # Should probably fix
         multi_gpu = len([x for x in os.popen("nvidia-smi -L").read().split("\n") if "GPU" in x])
         args.gpu = ','.join([str(i) for i in range(multi_gpu)])
         print(args.gpu)
+    #args.gpu=1
     
     # Separate losses and metrics for training and decorrelation
     if opts.decor and opts.loss=='loss_reg':

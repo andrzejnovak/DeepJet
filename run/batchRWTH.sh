@@ -30,8 +30,8 @@ mkdir $INDIR
 cd ~/DDX/DeepJet
 source gpu_env.sh
 cd Train
-convertFromRoot.py -i ../train_list.txt -o $INDIR/dctrain -c TrainData_DeepDoubleC_lowest
-python Train.py -i $INDIR/dctrain/dataCollection.dc -o $INDIR/training --batch 4096 --epochs 100 --resume
+convertFromRoot.py -i ../train_list.txt -o $INDIR/dctrain -c TrainData_DeepDoubleB_reference
+python Train.py -i $INDIR/dctrain/dataCollection.dc -o $INDIR/training --batch 1000 --epochs 100 --resume
 #cp -r $INDIR/training $INDIR/training_nodec
 #python Train.py -i $INDIR/dctrain/dataCollection.dc -o $INDIR/training --batch 4096 --epochs 20 --resume --decor
 
