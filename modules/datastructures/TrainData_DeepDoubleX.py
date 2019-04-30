@@ -54,7 +54,6 @@ class TrainData_DeepDoubleX(TrainData):
             return numpy.vstack((q,h)).transpose()  
         
 class TrainData_DeepDoubleX_db(TrainData_DeepDoubleX):
-    # NOT UP TO DATE 
     
     def __init__(self):
         '''
@@ -62,8 +61,8 @@ class TrainData_DeepDoubleX_db(TrainData_DeepDoubleX):
         '''
         TrainData_DeepDoubleX.__init__(self)
 
-        self.remove = True
-        self.weight = False
+        self.remove = False
+        self.weight = True
         #example of how to register global branches
         self.addBranches(['fj_pt',
                           'fj_eta',
@@ -124,77 +123,82 @@ class TrainData_DeepDoubleX_db(TrainData_DeepDoubleX):
         import numpy
         import ROOT
         
-        fileTimeOut(filename,120) #give eos 2 minutes to recover
+        fileTimeOut(filename, 60) #give eos 1 minutes to recover
         rfile = ROOT.TFile.Open(filename)
         tree = rfile.Get("deepntuplizer/tree")
         self.nsamples=tree.GetEntries()
+        
+        #the definition of what to do with the branches
+        
+        # those are the global branches (jet pt etc)
+        # they should be just glued to each other in one vector
+        # and zero padded (and mean subtracted and normalised)
+        # x_global = MeanNormZeroPad(filename,TupleMeanStd,
+        #                           [self.branches[0]],
+        #                           [self.branchcutoffs[0]],self.nsamples)
+        # the second part (the pf candidates) should be treated particle wise
+        # an array with (njets, nparticles, nproperties) is created
+	#
+	# MeanNormZeroPad[Particles] does preprocessing, ZeroPad[Particles] does not and we normalzie it with batch_norm layer
+	# MeanNorm* does not work when putting the model into cmssw
     
-        x_glb  = ZeroPadParticles(filename,TupleMeanStd,
+        x_glb  = ZeroPadParticles(filename,None,
                                           self.branches[0],
                                           self.branchcutoffs[0],self.nsamples)
 
-        x_db  = MeanNormZeroPadParticles(filename,TupleMeanStd,
+        x_db  = ZeroPadParticles(filename,None,
                                          self.branches[1],
                                          self.branchcutoffs[1],self.nsamples)
         
-        # now, some jets are removed to avoid pt and eta biases
         
+	# Load tuple
         Tuple = self.readTreeFromRootToTuple(filename)
-        #if self.remove:
-            # jets are removed until the shapes in eta and pt are the same as
-            # the truth class 'fj_isNonBB'
-        notremoves=weighter.createNotRemoveIndices(Tuple)
+	# Append classes constructed in reduceTruth fcn
+	truth_array =  Tuple[self.truthclasses]
+        import numpy.lib.recfunctions as rfn
+	reduced_truth = self.reduceTruth(truth_array).transpose()
+	for i, label in enumerate(self.reducedtruthclasses):
+		Tuple = rfn.append_fields(Tuple, label, reduced_truth[i])
+
+        if self.remove:
+            notremoves=weighter.createNotRemoveIndices(Tuple)
         if self.weight:
             weights=weighter.getJetWeights(Tuple)
         elif self.remove:
-            weights=notremoves
+            weights=notremoves #weighter.createNotRemoveIndices(Tuple)
         else:
             print('neither remove nor weight')
             weights=numpy.empty(self.nsamples)
             weights.fill(1.)
+	    
+        used_truth=self.reduceTruth(truth_array)
+	undef=numpy.sum(used_truth,axis=1)
             
-            
-        # create all collections:
-        #truthtuple =  Tuple[self.truthclasses]
-        alltruth=self.reduceTruth(Tuple)
-        undef=numpy.sum(alltruth,axis=1)
-        #weights=weights[undef > 0]
-        #x_glb=x_glb[undef > 0]
-        #x_db=x_db[undef > 0]
-        #alltruth=alltruth[undef > 0]
-        notremoves=notremoves[undef > 0]
-
-        undef=Tuple['fj_isNonCC'] * Tuple['sample_isQCD'] * Tuple['fj_isQCD'] + Tuple['fj_isCC'] * Tuple['fj_isH']
-
-        # remove the entries to get same jet shapes
-        if self.remove:
-            print('remove')
+	if self.remove:
+	    print('Removing to match weighting')
+            notremoves=notremoves[undef > 0]
             weights=weights[notremoves > 0]
             x_glb=x_glb[notremoves > 0]
             x_db=x_db[notremoves > 0]
-            alltruth=alltruth[notremoves > 0]
+            used_truth=used_truth[notremoves > 0]
+	
+	if self.weight:
+	    print('Adding weights, removing events with 0 weight')
+            x_glb=x_glb[weights > 0]
+            x_db=x_db[weights > 0]
+            used_truth=used_truth[weights > 0]
+	    # Weights get adjusted last so they can be used as an index
+            weights=weights[weights > 0]
             
         newnsamp=x_glb.shape[0]
-        print('reduced content to ', int(float(newnsamp)/float(self.nsamples)*100),'%')
+        print('Keeping {}% of input events in the dataCollection'.format(int(float(newnsamp)/float(self.nsamples)*100)))
         self.nsamples = newnsamp
         
         # fill everything
         self.w=[weights]
         self.x=[x_db]
         self.z=[x_glb]
-        self.y=[alltruth]        
-
-    def reduceTruth(self, tuple_in):
-        import numpy
-        self.reducedtruthclasses=['QCD','Hcc']
-        if tuple_in is not None:
-            q = tuple_in['fj_isQCD']
-            q = q.view(numpy.ndarray)
-            h = tuple_in['fj_isCC'] * tuple_in['fj_isH']
-            h = h.view(numpy.ndarray)
-
-            return numpy.vstack((q,h)).transpose()
-
+        self.y=[used_truth]
 
 #######################################
             
@@ -216,7 +220,8 @@ class TrainData_DeepDoubleX_db_pf_cpf_sv(TrainData_DeepDoubleX):
                           'npv',
                           'npfcands',
                           'ntracks',
-                          'nsv'
+                          'nsv',
+                          'ntrueInt'
                       ])
         
         self.addBranches(['fj_jetNTracks',
@@ -422,7 +427,8 @@ class TrainData_DeepDoubleX_db_cpf_sv_reduced(TrainData_DeepDoubleX):
                           'npv',
                           'npfcands',
                           'ntracks',
-                          'nsv'
+                          'nsv',
+                          'ntrueInt'
                       ])
         
         self.addBranches(['fj_jetNTracks',
@@ -653,6 +659,21 @@ class TrainData_DeepDoubleCvB_db_cpf_sv_reduced_incglu(TrainData_DeepDoubleX_db_
             h = h.view(numpy.ndarray)
             return numpy.vstack((q,h)).transpose()
 
+#####################################
+#          DeepDoubleBvL            #
+#####################################  
+class TrainData_DeepDoubleB_db(TrainData_DeepDoubleX_db):
+    ## categories to use for training
+    def reduceTruth(self, tuple_in):
+        import numpy
+        self.reducedtruthclasses=['QCD','Hbb']
+        if tuple_in is not None:
+	    q = tuple_in['fj_isQCD'] * tuple_in['sample_isQCD']
+            q = q.view(numpy.ndarray)
+            h = tuple_in['fj_isBB'] * tuple_in['fj_isH']
+            h = h.view(numpy.ndarray)
+
+            return numpy.vstack((q,h)).transpose()
 #####################################
 #          DeepDoubleBvL            #
 #####################################
