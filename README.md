@@ -3,9 +3,16 @@
 DeepJet: Repository for training and evaluation of deep neural networks for Jet identification
 ===============================================================================
 
-This package depends on DeepJetCore - original at (https://github.com/DL4Jets/DeepJetCore)
+~~This package depends on DeepJetCore - original at (https://github.com/DL4Jets/DeepJetCore)
 For work on DeepDoubleX (running on DESY/Maxwell GPU cluster or caltech cluster) follow instructions at:
-https://github.com/DeepDoubleB/DeepJetCore
+https://github.com/DeepDoubleB/DeepJetCore~~
+First clone and setup DeepJetCore, follow the instruction https://github.com/andrzejnovak/DeepJetCore
+
+###Clone DeepJet
+```
+git@github.com:andrzejnovak/DeepJet.git
+```
+
 
 Setup
 ==========
@@ -22,13 +29,19 @@ ssh max-wgs
 
 To run interactively:
 ```
-salloc -N 1 --partition=all --constraint=GPU --time=<minutes>
+salloc -N 1 --partition=allgpu --time=<minutes>
 ```
 
 Alternatively add the following to your .bashrc to get allocation for x hours with ``` getgpu x ```
 ```
 getgpu () {
-   salloc -N 1 --partition=all --constraint=GPU --time=$((60 * $1))
+   salloc -N 1 --partition=allgpu --time=$((60 * $1))
+}
+```
+To only get the lastest P100 gpus, faster, but less nodes
+```
+gettesla () {
+   salloc -N 1 --partition=allgpu --constraint=P100 --time=$((60 * $1))
 }
 ```
 

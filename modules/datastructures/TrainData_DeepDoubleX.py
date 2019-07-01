@@ -788,6 +788,14 @@ class TrainData_DeepDoubleX_reference(TrainData_DeepDoubleX_db_cpf_sv_reduced_5l
 	self.remove=False
         self.referenceclass='lowest'
 
+class TrainData_DeepDoubleX_reference3(TrainData_DeepDoubleX_db_cpf_sv_reduced_3lab):
+    def __init__(self):
+        TrainData_DeepDoubleX_db_cpf_sv_reduced_3lab.__init__(self)
+        #self.ignore_when_weighting=['gbb']  # to be used only with weight reference 'lowest'
+        self.weight=True
+        self.remove=False
+        self.referenceclass='lowest'
+
 # To create Z labels 
 class TrainData_DeepDoubleX_all(TrainData_DeepDoubleX_db_cpf_sv_reduced_7lab):
     def __init__(self):

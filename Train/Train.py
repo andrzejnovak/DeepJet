@@ -7,7 +7,7 @@ parser.add_argument("--decor", action='store_true', default=False, help="Serve d
 parser.add_argument("--reduced", action='store_true', default=False, help="reduced model")
 parser.add_argument("--loss", default="loss_kldiv", choices=['loss_kldiv', 'loss_kldiv_3class', 'loss_reg', 'loss_jsdiv'],
                     help="loss to use for decorrelated training")
-parser.add_argument("--lambda-adv", default='15', help="lambda for adversarial training", type=str)
+parser.add_argument("--lambda-adv", default='2', help="lambda for adversarial training", type=str)
 parser.add_argument("--classes", default='2', help="Number of classes for multiclassifier", type=str)
 parser.add_argument("-g", "--gpu", default=-1, help="Use 1 specific gpu (Need to be in deepjetLinux3_gpu env)", type=int)
 parser.add_argument("-m", "--multi-gpu", action='store_true', default=False, help="Use all visible gpus (Need to be in deepjetLinux3_gpu env)")
@@ -70,7 +70,6 @@ if True:  # Should probably fix
     
     # Separate losses and metrics for training and decorrelation
     if opts.decor and opts.loss=='loss_reg':
-        print("INFO: using LAMBDA_ADV = %f"%LAMBDA_ADV)
         print("INFO: using NCLASSES = %d"%NCLASSES)
         loss = loss_reg
         metrics = [acc_reg, mass_kldiv_q, mass_kldiv_h, loss_disc, loss_adv]
@@ -86,6 +85,7 @@ if True:  # Should probably fix
     else: 
         loss = 'categorical_crossentropy'
         metrics=['accuracy']
+    if opts.decor: print("INFO: using LAMBDA_ADV = %f"%LAMBDA_ADV)
 
     # Set up training
     train=training_base(splittrainandtest=0.9,testrun=False, useweights=True, resumeSilently=opts.resume, renewtokens=False, parser=args)
