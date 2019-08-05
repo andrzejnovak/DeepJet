@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser(description ='Script to run the training and evaluate it')
 parser.add_argument("--decor", action='store_true', default=False, help="Serve decorrelated training targets")
 parser.add_argument("--reduced", action='store_true', default=False, help="reduced model")
+parser.add_argument("--simple", action='store_true', default=False, help="simple model")
 parser.add_argument("--loss", default="loss_kldiv", choices=['loss_kldiv', 'loss_kldiv_3class', 'loss_reg', 'loss_jsdiv'],
                     help="loss to use for decorrelated training")
 parser.add_argument("--lambda-adv", default='15', help="lambda for adversarial training", type=str)
@@ -36,14 +37,18 @@ class MyClass:
         self.outputDir = ''
         
 sampleDatasets_cpf_sv = ["db","cpf","sv"]
+#sampleDatasets_cpf_sv = ["db"]
         
 #select model and eval functions
 if opts.loss=='loss_reg':
     from models.convolutional import model_DeepDoubleXAdversarial as trainingModel
 elif opts.reduced:
     from models.convolutional import model_DeepDoubleXReduced as trainingModel
+elif opts.simple:
+    from models.convolutional import model_DeepDoubleXSimple  as trainingModel
 else:
     from models.convolutional import model_DeepDoubleXReference  as trainingModel
+
     
 from DeepJetCore.training.training_base import training_base
 
@@ -126,7 +131,7 @@ if True:  # Should probably fix
                                           lr_minimum=0.00000001, 
                                           maxqsize=100)
 
-        train.keras_model=fixLayersContaining(train.keras_model, 'input_batchnorm')
+        #train.keras_model=fixLayersContaining(train.keras_model, 'input_batchnorm')
 	
         # Need to recompile after fixing batchnorm weights or loading model and changing loss to decorrelate
         train.compileModel(learningrate=0.001,

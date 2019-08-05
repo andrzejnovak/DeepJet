@@ -484,6 +484,43 @@ def model_DeepDoubleXReference(inputs, num_classes, num_regclasses, datasets = [
 
     return model
 
+
+def model_DeepDoubleXSimple(inputs, num_classes, num_regclasses, datasets = ['db'], removedVars = None, multi_gpu=1,  **kwargs):
+
+    """
+    reference 1x1 convolutional model for 'deepDoubleX'
+    with recurrent layers and batch normalisation
+    """
+    kernel_initializer = 'he_normal'
+    kernel_initializer_fc = 'lecun_uniform'
+    normalizedInputs = []
+
+    for i in range(len(inputs)):
+        normedLayer = BatchNormalization(momentum=0.3,name = '%s_input_batchnorm'%datasets[i])(inputs[i])
+        normalizedInputs.append(normedLayer)
+
+    flattenLayers = []
+    for i in range(len(inputs)):
+        flattenLayers.append(Flatten()(normalizedInputs[i]))
+
+    if len(inputs)==1:
+        concat = flattenLayers[0]
+    else:
+        concat = Concatenate()(flattenLayers)
+
+    fc = FC(concat, 64, p=0.1, name='fc1')
+    fc = FC(fc, 32, p=0.1, name='fc2')
+    fc = FC(fc, 32, p=0.1, name='fc3')
+    output = Dense(num_classes, activation='softmax', name='ID_pred', kernel_initializer=kernel_initializer_fc)(fc)
+                            
+    model = Model(inputs=inputs, outputs=[output])
+    if multi_gpu > 1:
+        from multi_gpu_model import multi_gpu_model
+        model = multi_gpu_model(model, gpus=multi_gpu)
+
+    print(model.summary())
+    return model
+
 def model_DeepDoubleXReduced(inputs, num_classes, num_regclasses, datasets = ['db','cpf','sv'], removedVars = None, multi_gpu=1,  **kwargs):
 
     """
