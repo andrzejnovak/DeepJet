@@ -17,6 +17,22 @@ def acc_kldiv(y_in,x):
 
     return categorical_accuracy(y, x)
 
+def acc_disco(y_in,x):
+    """
+    Corrected accuracy to be used with custom loss_disco
+    """
+    y = y_in[:, 2:]
+
+    return categorical_accuracy(y, x)
+
+from disco import distance_corr as disco
+def val_disco(y_in, x):
+    m = y_in[:, 0]
+    ws = y_in[:, 1]
+    y = y_in[:, 2:]
+    return disco(m, x[:, 0], ws)
+
+
 def acc_reg(y_in,x_in):
     """
     Corrected accuracy to be used with custom loss_reg
@@ -87,6 +103,8 @@ def mass_kldiv_h(y_in,x):
 
 #please always register the loss function here
 global_metrics_list['acc_kldiv']=acc_kldiv
+global_metrics_list['acc_disco']=acc_disco
+global_metrics_list['val_disco']=val_disco
 global_metrics_list['mass_kldiv_q']=mass_kldiv_q
 global_metrics_list['mass_kldiv_h']=mass_kldiv_h
 global_metrics_list['acc_reg']=acc_reg

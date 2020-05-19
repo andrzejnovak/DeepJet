@@ -451,6 +451,7 @@ def model_DeepDoubleXReference(inputs, num_classes, num_regclasses, datasets = [
     kernel_initializer_fc = 'lecun_uniform'
     normalizedInputs = []
 
+    print(inputs)
     for i in range(len(inputs)):
         normedLayer = BatchNormalization(momentum=0.3,name = '%s_input_batchnorm'%datasets[i])(inputs[i])
         normalizedInputs.append(normedLayer)

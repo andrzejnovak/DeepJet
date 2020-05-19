@@ -14,7 +14,7 @@ export DEEPJET=`pwd`
 #mkdir -p $CUDA_CACHE_PATH
 
 # for Maxwell (DESY) cluster
-#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/software/TensorFlow/lib64/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/software/TensorFlow/lib64/
 
 # for RWTH cluster 
 #module load cuda/90

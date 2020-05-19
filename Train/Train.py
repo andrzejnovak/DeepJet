@@ -8,6 +8,7 @@ parser.add_argument("--reduced", action='store_true', default=False, help="reduc
 parser.add_argument("--simple", action='store_true', default=False, help="simple model")
 parser.add_argument("--loss", default="loss_kldiv", choices=['loss_kldiv', 'loss_kldiv_3class', 'loss_reg', 'loss_jsdiv'],
                     help="loss to use for decorrelated training")
+parser.add_argument("--disco", default=False, action='store_true')
 parser.add_argument("--lambda-adv", default='15', help="lambda for adversarial training", type=str)
 parser.add_argument("--scale", default='1', help="(initial) scale factor (-lambda_r) for backprop during adversarial training", type=str)
 parser.add_argument("--scale-callback",action='store_true', default = False, help = "scale factor (-lambda_r) callback to set it to 2/(1+exp(-10*i_epoch/n_epochs)-1")
@@ -20,9 +21,13 @@ parser.add_argument("--batch",  help="Batch size, default = 2000", default=2000,
 parser.add_argument("--epochs",  help="Epochs, default = 50", default=50, metavar="INT")
 parser.add_argument("--resume", action='store_true', default=False, help="Continue previous")
 parser.add_argument("--pretrained-model", default=None, help="start from specified pretrained model", type=str)
+parser.add_argument("--datasets", default=None, choices=['db', 'db_pf_cpf_sv', 'db_cpf_sv'])
 opts=parser.parse_args()
 if opts.decor:  os.environ['DECORRELATE'] = "True"
 else:  os.environ['DECORRELATE'] = "False"
+if opts.disco:  os.environ['DISCO'] = "True"
+else:  os.environ['DISCO'] = "False"
+
 os.environ['LAMBDA_ADV'] = opts.lambda_adv
 os.environ['NCLASSES'] = opts.classes
 
@@ -35,9 +40,13 @@ class MyClass:
 	self.modelMethod = ''
         self.inputDataCollection = ''
         self.outputDir = ''
-        
-sampleDatasets_cpf_sv = ["db","cpf","sv"]
-#sampleDatasets_cpf_sv = ["db"]
+
+if opts.datasets is not None:
+    sampleDatasets_cpf_sv = opts.datasets.split("_")
+
+else:        
+    sampleDatasets_cpf_sv = ["db","cpf","sv"]
+    #sampleDatasets_cpf_sv = ["db"]
         
 #select model and eval functions
 if opts.loss=='loss_reg':
@@ -52,10 +61,10 @@ else:
     
 from DeepJetCore.training.training_base import training_base
 
-from Losses import loss_NLL, loss_meansquared, loss_kldiv, loss_kldiv_3class, global_loss_list, custom_crossentropy, loss_jsdiv, loss_reg, NBINS, NCLASSES, loss_disc, loss_adv, LAMBDA_ADV, loss_disc_kldiv
+from Losses import loss_NLL, loss_meansquared, loss_kldiv, loss_kldiv_3class, global_loss_list, custom_crossentropy, loss_jsdiv, loss_reg, NBINS, NCLASSES, loss_disc, loss_adv, LAMBDA_ADV, loss_disc_kldiv, loss_disco
 from DeepJetCore.modeltools import fixLayersContaining,printLayerInfosAndWeights
 from Layers import global_layers_list
-from Metrics import global_metrics_list, acc_kldiv, mass_kldiv_q, mass_kldiv_h, acc_reg, mass_jsdiv_q
+from Metrics import global_metrics_list, acc_kldiv, acc_disco, val_disco, mass_kldiv_q, mass_kldiv_h, acc_reg, mass_jsdiv_q
 from keras import backend as K
 custom_objects_list = {}
 custom_objects_list.update(global_loss_list)
@@ -77,7 +86,10 @@ if True:  # Should probably fix
         print(args.gpu)
     
     # Separate losses and metrics for training and decorrelation
-    if opts.decor and opts.loss=='loss_reg':
+    if opts.disco:
+        loss = loss_disco
+        metrics=[acc_disco, val_disco]
+    elif opts.decor and opts.loss=='loss_reg':
         print("INFO: using LAMBDA_ADV = %f"%LAMBDA_ADV)
         print("INFO: using NCLASSES = %d"%NCLASSES)
         loss = loss_reg
@@ -112,11 +124,12 @@ if True:  # Should probably fix
                        **modelargs)
         train.compileModel(learningrate=0.001,
                            loss=[loss],
-	                   metrics=metrics,
-			   loss_weights=[1.])
+	                       metrics=metrics,
+			               loss_weights=[1.])
         
         if os.path.isfile(opts.o+"/KERAS_check_best_model.h5"): # To make sure no training is lost on restart
             train.loadWeights(opts.o+"/KERAS_check_best_model.h5")
+            print "XXXXXXX loading Weights XXXXXX"
             print "Loaded weights from existing model in output directory."
 
     # Pretrain and fix batch normalization weights to be consistent

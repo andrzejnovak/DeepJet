@@ -13,13 +13,13 @@ if args.test == None:
 
 
 ### Write train input list
-path = args.train
-if path.endswith("/"): path = path[:-1]
-f = open('train_'+args.listname+'.txt', 'w')
-for i in os.listdir(path):
-	if not i.endswith("root"): continue
-	f.write(path+"/"+i+'\n')
-f.close()
+#path = args.train
+#if path.endswith("/"): path = path[:-1]
+#f = open('train_'+args.listname+'.txt', 'w')
+#for i in os.listdir(path):
+#	if not i.endswith("root"): continue
+#	f.write(path+"/"+i+'\n')
+#f.close()
 
 
 #path = '/eos/user/a/anovak/test2files/test'

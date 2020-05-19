@@ -62,12 +62,12 @@ def loss_jsdiv(y_in,x):
     """
     h = y_in[:,0:NBINS]
     y = y_in[:,NBINS:NBINS+2]
-    
+
     # build mass histogram for true q events weighted by q, b prob
     h_alltag_q = K.dot(K.transpose(h), K.dot(tf.diag(y[:,0]),x))
     # build mass histogram for true b events weighted by q, b prob
     h_alltag_b = K.dot(K.transpose(h), K.dot(tf.diag(y[:,1]),x))
-    
+
     # select mass histogram for true q events weighted by q prob; normalize
     h_qtag_q = h_alltag_q[:,0]
     h_qtag_q = h_qtag_q / K.sum(h_qtag_q,axis=0)
@@ -95,6 +95,16 @@ def loss_jsdiv(y_in,x):
 
 #please always register the loss function here                                                                                              
 global_loss_list['loss_jsdiv']=loss_jsdiv
+
+from disco import distance_corr as disco
+def loss_disco(y_in, x):
+    m = y_in[:, 0]
+    ws = y_in[:, 1]
+    y = y_in[:, 2:]
+    cc = categorical_crossentropy(y, x)
+    return cc + cc*disco(m, x[:, 0], ws)
+
+global_loss_list['loss_disco']=loss_disco
 
 def custom_crossentropy(y_in,x):
     """

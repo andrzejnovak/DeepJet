@@ -15,7 +15,6 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc
-from root_numpy import array2root
 import pandas as pd
 import h5py
 from Losses import NBINS
@@ -25,7 +24,7 @@ sess = tf.InteractiveSession()
 
 def loadModel(inputDir,trainData,model,LoadModel,sampleDatasets=None,removedVars=None,adv=False):
     inputModel = '%s/KERAS_check_best_model.h5'%inputDir
-  
+
     from DeepJetCore.DataCollection import DataCollection
     traind=DataCollection()
     traind.readFromFile(trainData)
@@ -51,79 +50,74 @@ def loadModel(inputDir,trainData,model,LoadModel,sampleDatasets=None,removedVars
 
     return evalModel
 
-def evaluate(testd, trainData, model, outputDir, storeInputs=False, adv=False):
-    	NENT = 1  # Can skip some events
-    	filelist=[]
-        i=0
-        for s in testd.samples:
-        #for s in testd.samples[0:1]:
-            spath = testd.getSamplePath(s)
-            filelist.append(spath)
-            h5File = h5py.File(spath)
-   	    f = h5File
-            #features_val = [h5File['x%i_shape'%j][()] for j in range(0, h5File['x_listlength'][()][0])]
-            features_val = [h5File['x%i'%j][()] for j in range(0, h5File['x_listlength'][()][0])]
-            #features_val=testd.getAllFeatures()
-            predict_test_i = model.predict(features_val)
-            labels_val_i = h5File['y0'][()][::NENT,:]
-            spectators_val_i = h5File['z0'][()][::NENT,0,:]
-            if storeInputs: raw_features_val_i = h5File['z1'][()][::NENT,0,:]
-            if i==0:
-                predict_test = predict_test_i
-                labels_val = labels_val_i
-                spectators_val = spectators_val_i
-                if storeInputs: raw_features_val = raw_features_val_i                                                    
+def evaluate(testd, trainData, model, outputDir, storeInputs=False, adv=False, tlimit=None):
+    """
+    tlimit ~ time limit to stop in minutes
+
+    """
+    NENT = 20  # Chunk it
+    filelist = []
+
+    feature_names = testd.dataclass.branches[1]
+    spectator_names = testd.dataclass.branches[0]
+
+    from DeepJetCore.DataCollection import DataCollection
+    traind = DataCollection()
+    traind.readFromFile(trainData)
+    truthnames = traind.getUsedTruth()
+    cols = spectator_names + ['predict' + tn for tn in truthnames
+                              ] + ['truth' + tn for tn in truthnames]
+    df = pd.DataFrame([], columns=cols)
+
+    import time
+    tic = time.time()
+
+    for i, s in enumerate(testd.samples):
+        spath = testd.getSamplePath(s)
+        filelist.append(spath)
+        h5File = h5py.File(spath)
+
+        for ni in range(NENT):
+            print('Processing chunk - {}/{} '.format(((i) * NENT + ni),
+                                                     len(testd.samples) * NENT))
+            features_val = [
+                h5File['x%i' % j][()][ni::NENT]
+                for j in range(0, h5File['x_listlength'][()][0])
+            ]
+            if adv:
+                predict_test_i = model.predict(features_val, batch_size=8192)[:, NBINS:]
             else:
-                predict_test = np.concatenate((predict_test,predict_test_i))
-                labels_val = np.concatenate((labels_val, labels_val_i))
-                spectators_val = np.concatenate((spectators_val, spectators_val_i))
-                if storeInputs: raw_features_val = np.concatenate((raw_features_val, raw_features_val_i))
-            i+=1
+                predict_test_i = model.predict(features_val, batch_size=8192)
+            labels_val_i = h5File['y0'][()][ni::NENT, :]
+            spectators_val_i = h5File['z0'][()][ni::NENT, 0, :]
 
-        # Value
-	#labels_val=testd.getAllLabels()[0][::NENT,:]
-        #features_val=testd.getAllFeatures()[0][::NENT,0,:]
-        #spectators_val = testd.getAllSpectators()[0][::NENT,0,:]
-        #if storeInputs: raw_features_val = testd.getAllSpectators()[-1][::NENT,0,:]
-        
-	# Labels
-	print testd.dataclass.branches
-	feature_names = testd.dataclass.branches[1]
-	spectator_names = testd.dataclass.branches[0]
-        #truthnames = testd.getUsedTruth()
-        
-	from DeepJetCore.DataCollection import DataCollection                 
-    	traind=DataCollection()
-	traind.readFromFile(trainData)
-	truthnames = traind.getUsedTruth()
-	# Store features                                            
-	print "Coulmns", spectator_names                   
-        df = pd.DataFrame(spectators_val, columns = spectator_names)
+            #tdf = pd.DataFrame(spectators_val_i)
+            print(spectators_val_i.shape)
+            print(labels_val_i.shape)
+            print(predict_test_i.shape)
+            tnp = np.concatenate([spectators_val_i, predict_test_i, labels_val_i],
+                                 axis=1)
+            tdf = pd.DataFrame(tnp, columns=cols)
+            df = df.append(tdf)
 
-	if storeInputs: 
-		for i, tname in enumerate(feature_names):
-			df[tname] = raw_features_val[:,i]
+            # Some timing
+            frc = ((i) * NENT + ni) / float((len(testd.samples) * NENT)) + 0.0001
+            lapsed = time.time() - tic
+            tot_time = lapsed / frc
+            print("ETA: {0:.2f} mins".format((tot_time - lapsed) / 60))
 
-	# Add predictions
-	print truthnames
-	print predict_test.shape
-	for i, tname in enumerate(truthnames):
-		df['truth'+tname] = labels_val[:,i]
-		#print "Mean 0th label predict predict of ", tname, np.mean(predict_test[:,0]), ", Stats:", np.sum(labels_val[:,i]), "/", len(labels_val[:,i])
-                if adv:
-		    df['predict'+tname] = predict_test[:,NBINS+i]
-                    for j in range(NBINS):
-                        df['predict_massbin%i'%j] = predict_test[:,j+i]
-                else:
-                    df['predict'+tname] = predict_test[:,i]
+            if df.shape[0] > 3000000:
+                break
 
-	print "Testing prediction:"
-	print "Total: ", len(predict_test[:,0])
-	for lab in truthnames:
-		print lab, ":", sum(df['truth'+lab].values)
+            if tlimit is not None:    
+                if lapsed > 60*tlimit:
+                    break
 
-	df.to_pickle(outputDir+'/output.pkl')    #to save the dataframe, df to 123.pkl
-	return df
-	print "Finished storing dataframe"	
+    print("Testing prediction:")
+    print("Total: ", len(df))
+    for lab in truthnames:
+        print(lab, ":", sum(df['truth' + lab].values))
 
-	    
+    df.to_pickle(outputDir + '/output.pkl')
+
+    return df

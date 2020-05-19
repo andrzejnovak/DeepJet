@@ -12,7 +12,7 @@
 #SBATCH --mail-type FAIL, END                 # Type of email notification- BEGIN,END,FAIL,ALL
 #SBATCH --mail-user novak@physik.rwth-aachen.de  # Email to which notifications will be sent
 
-INDIR=~/data/dev/80x/DDB
+INDIR=~/data/dev/94MX/DDB
 #rm -r $INDIR
 mkdir $INDIR   
 cd ~/data/Mauro/DeepJet
